@@ -1,12 +1,17 @@
-
 export async function callOllamaVision(base64Image) {
-
   const ollamaData = {
     model: "llama3.2-vision:latest",
     messages: [
       {
         role: "user",
-        content: "Extract all handwritten text from this image.",
+        content: `
+        Extract the handwritten text from the image and output it using Markdown formatting only. 
+        If the text includes headers or section titles, use Markdown header syntax (e.g., # Header). 
+        For lists or clear structure, use the appropriate Markdown. 
+        Do not include any plain text version, introductions, explanations, 
+        or extra words—output only the transcribed text, formatted in Markdown. 
+        If there is no text in the image, respond with: No text found
+`,
         images: [base64Image],
       },
     ],
@@ -20,13 +25,15 @@ export async function callOllamaVision(base64Image) {
 
   const resultText = await ollamaResp.text();
 
-  console.log(resultText);
-  
   const objects = resultText
-    .split('\n')
-    .filter(line => line.trim().length > 0)
-    .map(line => {
-      try { return JSON.parse(line); } catch { return null; }
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
     })
     .filter(Boolean);
 

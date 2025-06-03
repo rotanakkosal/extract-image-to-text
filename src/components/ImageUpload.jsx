@@ -10,8 +10,13 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
-export default function ImageDropzoneUpload() {
+import ImageCropper from "@/components/ImageCropper";
+import getCroppedImg from "@/utils/getCroppedImg"; // See earlier messages for this helper
+import { ollamaSummary } from "@/services/ollamaService";
+
+export default function ImageUpload() {
   const inputRef = useRef();
   const textareaRef = useRef();
 
@@ -21,6 +26,13 @@ export default function ImageDropzoneUpload() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Croping Image State
+  const [cropping, setCropping] = useState(false);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const [summary, setSummary] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   // auto-resize textarea
   useEffect(() => {
@@ -57,11 +69,32 @@ export default function ImageDropzoneUpload() {
   // Display preview and store file
   function handleFile(file) {
     setFile(file);
-    setResult(""); // Clear previous results
+    setResult("");
     const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result);
+    reader.onload = () => {
+      setPreview(reader.result);
+      setCropping(true);
+    };
     reader.readAsDataURL(file);
   }
+
+  // Handle crop confirmation
+  const handleCropConfirm = async (pixels) => {
+    try {
+      const croppedBlob = await getCroppedImg(preview, pixels);
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      setPreview(croppedUrl);
+      setFile(
+        new File([croppedBlob], file.name.replace(/\.[^.]+$/, ".png"), {
+          type: "image/png",
+        })
+      );
+      setCropping(false);
+    } catch (err) {
+      alert("Cropping failed: " + err.message);
+      setCropping(false);
+    }
+  };
 
   // Upload and get extracted text
   async function handleSubmit(e) {
@@ -69,6 +102,7 @@ export default function ImageDropzoneUpload() {
     if (!file) return;
     setLoading(true);
     setResult("");
+    setSummary("");
     const formData = new FormData();
     formData.append("file", file);
 
@@ -143,10 +177,19 @@ export default function ImageDropzoneUpload() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Text Extractor
           </h1>
         </div>
+
+        {/* Cropping and Preview */}
+        {/* {cropping && preview && (
+          <ImageCropper
+            imageSrc={preview}
+            onCancel={() => setCropping(false)}
+            onCropCompleteConfirm={handleCropConfirm}
+          />
+        )} */}
 
         {/* Row: Upload + Preview */}
         <div className="flex flex-col md:flex-row gap-8">
@@ -257,6 +300,7 @@ export default function ImageDropzoneUpload() {
             </div>
           </div>
         </div>
+
         {/* Extracted Text spans the full width below */}
         <div className="mt-8">
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden w-full">
@@ -286,12 +330,36 @@ export default function ImageDropzoneUpload() {
                     >
                       <Download className="h-5 w-5" />
                     </button>
+                    <button
+                      onClick={async () => {
+                        setSummaryLoading(true);
+                        setSummary("");
+                        try {
+                          // Call the ollamaSummary service
+                          const resp = await ollamaSummary(result);
+                          setSummary(resp);
+                        } catch (err) {
+                          setSummary("Failed to summarize: " + err.message);
+                        }
+                        setSummaryLoading(false);
+                      }}
+                      className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      title="Summarize extracted text"
+                      disabled={summaryLoading}
+                    >
+                      {summaryLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <span className="font-medium">Summary</span>
+                      )}
+                    </button>
                   </div>
                 )}
               </div>
               <div className="flex-1 min-h-0">
                 {result ? (
-                  <div className="h-full flex flex-col">
+                  <div className="h-full flex flex-col gap-4">
+                    {/* Editable textarea */}
                     <div className="flex-1 min-h-0">
                       <textarea
                         ref={textareaRef}
@@ -302,6 +370,23 @@ export default function ImageDropzoneUpload() {
                         placeholder="Extracted text will appear here..."
                       />
                     </div>
+                    {/* Markdown preview */}
+                    <div className="flex-1 min-h-0">
+                      <div className="w-full p-4 border border-dashed border-gray-300 rounded-xl bg-gray-50 min-h-[120px]">
+                        <div className="prose prose-blue max-w-none">
+                          <ReactMarkdown>{result}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Text Summary */}
+                    {summary && (
+                      <div className="mt-6 p-4 border border-purple-200 bg-purple-50 rounded-xl text-gray-800">
+                        <h4 className="font-semibold mb-2 text-purple-800">
+                          Summary
+                        </h4>
+                        <div>{summary}</div>
+                      </div>
+                    )}
                     <div className="mt-3 flex justify-between items-center text-sm text-gray-500">
                       <span>{result.length} characters</span>
                       <span>{result.split("\n").length} lines</span>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { callOllamaVision } from "@/lib/ollamaVision";
 import { extractContents } from "@/lib/extractContent";
 import { fileToBase64PNG } from "@/lib/covertImgBase64";
+import { ollamaVision } from "@/services/ollamaService";
 
 export async function POST(request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request) {
     }
 
     const base64Image = await fileToBase64PNG(file);
-    const objects = await callOllamaVision(base64Image);
+    const objects = await ollamaVision(base64Image);
     const contents = extractContents(objects);
 
     return NextResponse.json({ text: contents }, { status: 200 });
