@@ -18,7 +18,7 @@ export const metadata = {
     apple: "/logo.png",
     shortcut: "/favicon-32x32.png",
   },
-  description: "Extact handwritten text from images using Ollama Vision",
+  description: "Extract handwritten text from images using Ollama Vision",
 };
 
 export default function RootLayout({ children }) {
